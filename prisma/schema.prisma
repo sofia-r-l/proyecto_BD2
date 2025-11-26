@@ -1,0 +1,15 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlserver"
+  url      = env("DATABASE_URL")
+}
+
+// Modelo temporal REQUERIDO para versiones antiguas de Prisma
+model Dummy {
+  id Int @id @default(autoincrement())
+  
+  @@map("_dummy_table")
+}
