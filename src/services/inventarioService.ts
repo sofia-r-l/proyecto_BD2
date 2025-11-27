@@ -47,6 +47,21 @@ export class InventarioService {
             throw error
         }
     }
+
+
+    async getProductosConAlerta(): Promise<InventarioSucursal[]> {
+        try {
+            const result = await prisma.$queryRaw<InventarioSucursal[]>`
+        SELECT * FROM vw_InventarioSucursal 
+        WHERE Cantidad < 50
+        ORDER BY Cantidad ASC
+      `;
+            return result;
+        } catch (error) {
+            console.error('Error en getProductosConAlerta:', error);
+            throw error;
+        }
+    }
 }
 
 export const inventarioService = new InventarioService()

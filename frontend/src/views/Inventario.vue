@@ -30,6 +30,15 @@
       <button @click="mostrarSoloBajo" class="btn-alerta" :class="{ active: mostrarBajoStock }">
         ⚠️ Stock Bajo ({{ inventarioBajoCount }})
       </button>
+
+      <!-- Botón para generar orden de compra -->
+      <button 
+        @click="mostrarModalOrdenCompra" 
+        class="btn-orden-compra" 
+        :disabled="inventarioBajoCount === 0 || loading"
+      >
+        📋 Generar Orden ({{ inventarioBajoCount }})
+      </button>
     </div>
 
     <!-- Estadísticas rápidas -->
@@ -101,6 +110,214 @@
       </div>
     </div>
 
+    <!-- Modal para Orden de Compra -->
+<div v-if="mostrarModal" class="modal-overlay" @click="cerrarModal">
+  <div class="modal-content" @click.stop>
+    <div class="modal-header">
+      <h3>📋 Generar Orden de Compra</h3>
+      <button class="btn-cerrar" @click="cerrarModal">×</button>
+    </div>
+    
+    <div class="modal-body">
+      <div v-if="cargandoProductos" class="sin-datos">
+        <p>🔄 Cargando productos con stock bajo...</p>
+      </div>
+
+      <div v-else-if="errorCarga" class="sin-datos">
+        <p>❌ Error al cargar productos: {{ errorCarga }}</p>
+        <button @click="reintentarCarga" class="btn-alerta">Reintentar</button>
+      </div>
+
+      <form v-else @submit.prevent="generarOrdenCompra" class="form-orden-compra">
+        <div class="filtro-group">
+          <label for="producto">Producto *</label>
+          
+          <select 
+          id="producto"
+          v-model="ordenCompra.ProductoID"
+          required
+          @change="onProductoChange"
+          class="form-select"
+          :disabled="productosConAlerta.length === 0"
+        >
+          <option value="0">Seleccione un producto</option>
+          <option 
+            v-for="(producto, index) in productosConAlerta" 
+            :key="index"
+            :value="index + 1"
+          >
+            {{ producto.Producto }} - {{ producto.Sucursal }} 
+            (Stock: {{ producto.Cantidad }} - {{ getEstadoStock(producto.Cantidad) }})
+          </option>
+        </select>
+          <small style="color: #7f8c8d; font-size: 0.8rem;">
+            Solo se muestran productos con stock bajo o crítico
+          </small>
+          <div v-if="productosConAlerta.length === 0" style="background: #fff3cd; border: 1px solid #ffeaa7; color: #856404; padding: 0.75rem; border-radius: 5px; margin-top: 0.5rem;">
+            ⚠️ No hay productos con stock bajo en este momento
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <!-- ⭐⭐ AGREGAR ESTE CAMPO DE PROVEEDORES QUE FALTA ⭐⭐ -->
+          <div class="filtro-group">
+            <label for="proveedor">Proveedor *</label>
+            <select 
+              id="proveedor"
+              v-model="ordenCompra.ProveedorID" 
+              required
+              @change="onProveedorChange"
+              class="form-select"
+              :disabled="productosConAlerta.length === 0 || cargandoProveedores"
+            >
+              <option value="">Seleccione proveedor</option>
+              <option 
+                v-for="proveedor in proveedores" 
+                :key="proveedor.ProveedorID"
+                :value="proveedor.ProveedorID"
+                :title="`${proveedor.IdentidadFiscal} - ${proveedor.Telefono} - Crédito: L. ${proveedor.CreditoDisponible.toLocaleString()}`"
+              >
+                {{ proveedor.Nombre }} 
+                <span v-if="proveedor.CreditoDisponible < 10000" style="color: #e74c3c;">
+                  (L. {{ proveedor.CreditoDisponible.toLocaleString() }} disp.)
+                </span>
+                <span v-else style="color: #27ae60;">
+                  (L. {{ proveedor.CreditoDisponible.toLocaleString() }} disp.)
+                </span>
+              </option>
+            </select>
+            <small style="color: #7f8c8d; font-size: 0.8rem;">
+              Se muestra el crédito disponible de cada proveedor
+            </small>
+            <div v-if="cargandoProveedores" style="color: #7f8c8d; font-size: 0.8rem;">
+              🔄 Cargando proveedores...
+            </div>
+            <div v-if="proveedores.length === 0 && !cargandoProveedores" style="background: #fff3cd; border: 1px solid #ffeaa7; color: #856404; padding: 0.75rem; border-radius: 5px; margin-top: 0.5rem;">
+              ⚠️ No hay proveedores disponibles
+            </div>
+          </div>
+          <!-- ⭐⭐ FIN DEL CAMPO AGREGADO ⭐⭐ -->
+
+          <div class="filtro-group">
+            <label for="cantidad">Cantidad a ordenar *</label>
+            <input 
+              id="cantidad"
+              type="number" 
+              v-model.number="ordenCompra.Cantidad" 
+              min="1"
+              required
+              style="padding: 0.5rem; border: 1px solid #ddd; border-radius: 5px;"
+              placeholder="Ej: 100"
+              :disabled="productosConAlerta.length === 0"
+            >
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+  <div class="filtro-group">
+    <label for="precio">Precio Unitario (L.) *</label>
+    <div 
+      style="padding: 0.5rem; border: 1px solid #ddd; border-radius: 5px; background: #f8f9fa; color: #555; min-height: 42px; display: flex; align-items: center;"
+    >
+      <strong v-if="ordenCompra.PrecioUnitario > 0">
+        L. {{ ordenCompra.PrecioUnitario.toLocaleString() }}
+      </strong>
+      <span v-else style="color: #7f8c8d;">
+        Seleccione un producto
+      </span>
+    </div>
+    <small style="color: #7f8c8d; font-size: 0.8rem;">
+      Precio actual del producto en inventario
+    </small>
+  </div>
+
+  <div class="filtro-group">
+    <label for="sucursal">Sucursal *</label>
+    <div 
+      style="padding: 0.5rem; border: 1px solid #ddd; border-radius: 5px; background: #f8f9fa; color: #555; min-height: 42px; display: flex; align-items: center;"
+    >
+      <strong v-if="sucursalSeleccionada">
+        {{ sucursalSeleccionada }}
+      </strong>
+      <span v-else style="color: #7f8c8d;">
+        Seleccione un producto
+      </span>
+    </div>
+    <small style="color: #7f8c8d; font-size: 0.8rem;">
+      Sucursal donde se enviará el producto
+    </small>
+  </div>
+
+
+  <div class="filtro-group">
+    <label for="fecha">Fecha de Entrega *</label>
+    <input 
+      id="fecha"
+      type="date" 
+      v-model="ordenCompra.FechaEntrega" 
+      required
+      style="padding: 0.5rem; border: 1px solid #ddd; border-radius: 5px;"
+      :min="minDate"
+      :disabled="productosConAlerta.length === 0"
+    >
+  </div>
+</div>
+
+        <!-- Información del producto seleccionado -->
+        <div class="filtro-group" v-if="productoSeleccionado">
+          <div style="background: #f8f9fa; padding: 1rem; border-radius: 5px; border-left: 4px solid #3498db;">
+            <h4 style="margin: 0 0 0.5rem 0; color: #2c3e50;">Información del Producto Seleccionado:</h4>
+            <p style="margin: 0.25rem 0; color: #555;"><strong>Stock actual:</strong> {{ productoSeleccionado.Cantidad }} unidades</p>
+            <p style="margin: 0.25rem 0; color: #555;"><strong>Estado:</strong> 
+              <span :class="{
+                'estado-critico': productoSeleccionado.Cantidad === 0,
+                'estado-alerta': productoSeleccionado.Cantidad > 0 && productoSeleccionado.Cantidad < 50
+              }">
+                {{ getEstadoStock(productoSeleccionado.Cantidad) }}
+              </span>
+            </p>
+            <p style="margin: 0.25rem 0; color: #555;"><strong>Sucursal:</strong> {{ productoSeleccionado.Sucursal }}</p>
+            <p style="margin: 0.25rem 0; color: #555;"><strong>Precio actual:</strong> L. {{ parseFloat(productoSeleccionado.PrecioBase).toLocaleString() }}</p>
+          </div>
+        </div>
+
+        <!-- ⭐⭐ AGREGAR TAMBIÉN LA INFORMACIÓN DEL PROVEEDOR SELECCIONADO ⭐⭐ -->
+        <div class="filtro-group" v-if="proveedorSeleccionado">
+          <div style="background: #f0f8ff; padding: 1rem; border-radius: 5px; border-left: 4px solid #2980b9;">
+            <h4 style="margin: 0 0 0.5rem 0; color: #2c3e50;">Información del Proveedor Seleccionado:</h4>
+            <p style="margin: 0.25rem 0; color: #555;"><strong>Identidad Fiscal:</strong> {{ proveedorSeleccionado.IdentidadFiscal }}</p>
+            <p style="margin: 0.25rem 0; color: #555;"><strong>Teléfono:</strong> {{ proveedorSeleccionado.Telefono }}</p>
+            <p style="margin: 0.25rem 0; color: #555;"><strong>Email:</strong> {{ proveedorSeleccionado.Email }}</p>
+            <p style="margin: 0.25rem 0; color: #555;">
+              <strong>Crédito disponible:</strong> 
+              <span :style="proveedorSeleccionado.CreditoDisponible < 10000 ? 'color: #e74c3c; font-weight: bold;' : 'color: #27ae60;'">
+                L. {{ proveedorSeleccionado.CreditoDisponible.toLocaleString() }}
+              </span>
+              de L. {{ proveedorSeleccionado.LimiteCredito.toLocaleString() }}
+            </p>
+            <p style="margin: 0.25rem 0; color: #555;"><strong>Saldo actual:</strong> L. {{ proveedorSeleccionado.SaldoActual.toLocaleString() }}</p>
+            <p style="margin: 0.25rem 0; color: #555;"><strong>Dirección:</strong> {{ proveedorSeleccionado.Direccion }}</p>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid #e9ecef;">
+          <button type="button" @click="cerrarModal" class="btn-alerta">
+            Cancelar
+          </button>
+          <button 
+            type="submit" 
+            class="btn-orden-compra"
+            :disabled="procesandoOrden || productosConAlerta.length === 0"
+          >
+            {{ procesandoOrden ? 'Procesando...' : 'Generar Orden' }}
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+</div>
+
     <!-- Loading -->
     <div v-if="loading" class="loading">
       <p>🔄 Cargando inventario...</p>
@@ -109,14 +326,39 @@
 </template>
 
 <script setup lang="ts">
+import { nextTick } from 'vue';
 import { ref, computed, onMounted } from 'vue';
-import { inventarioService, type ProductoInventario } from '@/services/inventario.service';
+import { 
+  inventarioService, 
+  type ProductoInventario, 
+  type ProductoConAlerta,
+  type OrdenCompra,
+  type Proveedor 
+} from '@/services/inventario.service';
 
+// Estados
 const inventario = ref<ProductoInventario[]>([]);
+const productosConAlerta = ref<ProductoConAlerta[]>([]);
 const loading = ref(true);
+const cargandoProductos = ref(false);
+const errorCarga = ref<string | null>(null);
 const filtroSucursal = ref('');
 const filtroCategoria = ref('');
 const mostrarBajoStock = ref(false);
+const mostrarModal = ref(false);
+const procesandoOrden = ref(false);
+const proveedores = ref<Proveedor[]>([]);
+const cargandoProveedores = ref(false);
+
+// Datos del formulario
+const ordenCompra = ref({
+  ProveedorID: 0,
+  ProductoID: 0,
+  Cantidad: 0,
+  PrecioUnitario: 0,
+  FechaEntrega: '',
+  SucursalID: 0
+});
 
 // Computed properties
 const sucursales = computed(() => {
@@ -155,6 +397,27 @@ const totalValorInventario = computed(() => {
   }, 0);
 });
 
+const proveedorSeleccionado = computed(() => {
+  if (!ordenCompra.value.ProveedorID) return null;
+  return proveedores.value.find((p: Proveedor) => p.ProveedorID === ordenCompra.value.ProveedorID);
+});
+
+const productoSeleccionado = computed(() => {
+  if (!ordenCompra.value.ProductoID) return null;
+  return productosConAlerta.value.find((p: ProductoConAlerta) => p.ProductoID === ordenCompra.value.ProductoID);
+});
+
+const minDate = computed(() => {
+  return new Date().toISOString().split('T')[0];
+});
+
+const onProveedorChange = () => {
+  if (proveedorSeleccionado.value) {
+    console.log('Proveedor seleccionado:', proveedorSeleccionado.value);
+  }
+};
+
+
 // Methods
 const getEstadoStock = (cantidad: number): string => {
   if (cantidad >= 50) return 'Normal';
@@ -170,20 +433,242 @@ const mostrarSoloBajo = () => {
   mostrarBajoStock.value = !mostrarBajoStock.value;
 };
 
-// Lifecycle
-onMounted(async () => {
+const cargarProveedores = async () => {
   try {
+    cargandoProveedores.value = true;
+    proveedores.value = await inventarioService.getProveedores();
+    console.log('✅ Proveedores cargados desde BD:', proveedores.value.length);
+    
+    // Debug: mostrar los proveedores cargados
+    proveedores.value.forEach(proveedor => {
+      console.log(`📋 ${proveedor.Nombre} - Crédito: L. ${proveedor.CreditoDisponible}`);
+    });
+  } catch (error) {
+    console.error('❌ Error cargando proveedores:', error);
+    alert('Error al cargar los proveedores: ' + (error instanceof Error ? error.message : 'Error desconocido'));
+  } finally {
+    cargandoProveedores.value = false;
+  }
+};
+
+const mostrarModalOrdenCompra = async () => {
+  try {
+    cargandoProductos.value = true;
+    errorCarga.value = null;
+    mostrarModal.value = true;
+    
+    console.log('📦 Inventario cargado:', inventario.value.length);
+    
+    // Filtrar productos con alerta
+    productosConAlerta.value = inventario.value
+      .filter(item => item.Cantidad < 50)
+      .map(item => ({
+        ...item,
+        Estado: item.Cantidad === 0 ? 'critico' : item.Cantidad < 20 ? 'critico' : 'alerta'
+      }));
+    
+    console.log('🚨 Productos con alerta:', productosConAlerta.value.length);
+    
+    // ⭐⭐ DEBUG DETALLADO DE PRODUCTOS CON ALERTA ⭐⭐
+    console.log('🔍 PRODUCTOS CON ALERTA - PRECIOS DETALLADOS:');
+    productosConAlerta.value.forEach((producto, index) => {
+      console.log(`   ${index + 1}. ID: ${producto.ProductoID}, "${producto.Producto}"`, {
+        PrecioBase: producto.PrecioBase,
+        Cantidad: producto.Cantidad,
+        SucursalID: producto.SucursalID
+      });
+    });
+    
+    // Cargar proveedores
+    await cargarProveedores();
+    
+    // Mantener ProductoID si ya había uno seleccionado
+    const productoIdAnterior = ordenCompra.value.ProductoID;
+    
+    ordenCompra.value = {
+      ProveedorID: 0,
+      ProductoID: productoIdAnterior,
+      Cantidad: 0,
+      PrecioUnitario: 0,
+      FechaEntrega: '',
+      SucursalID: 0
+    };
+    
+    // Si ya había un producto seleccionado, actualizar sus datos
+    if (productoIdAnterior > 0) {
+      console.log('🔄 Re-ejecutando onProductoChange para producto seleccionado:', productoIdAnterior);
+      setTimeout(() => {
+        onProductoChange();
+      }, 100);
+    }
+    
+  } catch (error) {
+    console.error('Error cargando modal:', error);
+    errorCarga.value = error instanceof Error ? error.message : 'Error desconocido';
+  } finally {
+    cargandoProductos.value = false;
+  }
+};
+
+const reintentarCarga = () => {
+  mostrarModalOrdenCompra();
+};
+
+const onProductoChange = () => {
+  console.log('🔄 onProductoChange ejecutado');
+  
+  const productoIndex = ordenCompra.value.ProductoID;
+  console.log('🎯 Índice seleccionado:', productoIndex);
+  
+  // Verificar que se seleccionó un producto válido (índice > 0)
+  if (!productoIndex || productoIndex === 0) {
+    console.log('❌ No hay producto seleccionado');
+    ordenCompra.value.PrecioUnitario = 0;
+    ordenCompra.value.SucursalID = 0;
+    return;
+  }
+  
+  // El índice 0 es "Seleccione un producto", así que restamos 1
+  const indexReal = productoIndex - 1;
+  
+  // Obtener el producto usando el índice
+  const producto = productosConAlerta.value[indexReal];
+  
+  if (producto) {
+    console.log('✅ Producto encontrado:', producto.Producto);
+    console.log('💰 PrecioBase:', producto.PrecioBase);
+    console.log('🏪 Sucursal:', producto.Sucursal);
+    
+    // ⭐⭐ SOLUCIÓN: Como no hay SucursalID, mapear el nombre de sucursal a un ID ⭐⭐
+    const sucursalId = mapearSucursalAId(producto.Sucursal);
+    
+    ordenCompra.value.SucursalID = sucursalId;
+    ordenCompra.value.PrecioUnitario = parseFloat(producto.PrecioBase) || 0;
+    
+    console.log('💰 Precio convertido:', ordenCompra.value.PrecioUnitario);
+    console.log('🏪 SucursalID asignado:', ordenCompra.value.SucursalID);
+    
+  } else {
+    console.log('❌ Producto no encontrado para índice:', indexReal);
+    ordenCompra.value.PrecioUnitario = 0;
+    ordenCompra.value.SucursalID = 0;
+  }
+};
+
+const sucursalSeleccionada = computed(() => {
+  if (!ordenCompra.value.ProductoID || ordenCompra.value.ProductoID === 0) {
+    return '';
+  }
+  
+  const indexReal = ordenCompra.value.ProductoID - 1;
+  const producto = productosConAlerta.value[indexReal];
+  
+  // Usar optional chaining para evitar el error
+  return producto?.Sucursal || '';
+});
+
+// FUNCIÓN PARA MAPEAR NOMBRE DE SUCURSAL A ID 
+const mapearSucursalAId = (sucursalNombre: string): number => {
+  const mapeoSucursales: { [key: string]: number } = {
+    'Sucursal Central': 1,
+    'Sucursal Norte': 2, 
+    'Sucursal Sur': 3,
+    // Agrega más mapeos según tus sucursales reales
+  };
+  
+  return mapeoSucursales[sucursalNombre] || 1; // Default a 1 si no se encuentra
+};
+
+
+
+const generarOrdenCompra = async () => {
+  try {
+    procesandoOrden.value = true;
+    
+    // Validaciones
+    if (ordenCompra.value.Cantidad <= 0) {
+      alert('La cantidad debe ser mayor a 0');
+      return;
+    }
+
+    if (ordenCompra.value.PrecioUnitario <= 0) {
+      alert('El precio unitario debe ser mayor a 0');
+      return;
+    }
+
+    const resultado = await inventarioService.crearOrdenCompra(ordenCompra.value);
+    
+    alert('✅ Orden de compra generada exitosamente');
+    console.log('Orden creada:', resultado);
+    
+    cerrarModal();
+    
+  } catch (error) {
+    console.error('Error generando orden de compra:', error);
+    alert('❌ Error al generar la orden de compra: ' + (error instanceof Error ? error.message : 'Error desconocido'));
+  } finally {
+    procesandoOrden.value = false;
+  }
+};
+
+const cerrarModal = () => {
+  mostrarModal.value = false;
+  productosConAlerta.value = [];
+  errorCarga.value = null;
+};
+
+const cargarInventario = async () => {
+  try {
+    loading.value = true;
     const data = await inventarioService.getInventario();
     inventario.value = data;
+    
+    console.log('🔍 ESTRUCTURA COMPLETA del response:', data);
+    console.log('📊 Total de productos:', data.length);
+    
+    if (data && data.length > 0) {
+      // Mostrar la estructura real del primer producto
+      const primerProducto = data[0] as any;
+      console.log('📦 ESTRUCTURA REAL DEL PRIMER PRODUCTO:', primerProducto);
+      console.log('📋 PROPIEDADES DISPONIBLES:', Object.keys(primerProducto));
+      
+      // Buscar propiedades que podrían ser el ID
+      const idProperties = Object.keys(primerProducto).filter(key => 
+        key.toLowerCase().includes('id') || key === 'id'
+      );
+      console.log('🆔 PROPIEDADES QUE PODRÍAN SER EL ID:', idProperties);
+      
+      // Mostrar los primeros 3 productos
+      console.log('🎯 PRIMEROS 3 PRODUCTOS:');
+      data.slice(0, 3).forEach((item, index) => {
+        const itemAny = item as any;
+        console.log(`   Producto ${index + 1}:`, {
+          Nombre: itemAny.Producto,
+          // Mostrar todas las propiedades que podrían ser el ID
+          IDs: idProperties.map(prop => `${prop}: ${itemAny[prop]}`),
+          PrecioBase: itemAny.PrecioBase,
+          Cantidad: itemAny.Cantidad
+        });
+      });
+    }
+    
   } catch (error) {
     console.error('Error cargando inventario:', error);
+    alert('Error al cargar el inventario');
   } finally {
     loading.value = false;
   }
+};
+
+
+// Lifecycle
+onMounted(async () => {
+  await cargarInventario();
 });
 </script>
 
 <style scoped>
+/* TODOS LOS ESTILOS ORIGINALES SE MANTIENEN IGUAL */
 .inventario {
   padding: 2rem;
   max-width: 1400px;
@@ -249,6 +734,30 @@ onMounted(async () => {
 .btn-alerta:hover {
   background: #e74c3c;
   color: white;
+}
+
+.btn-orden-compra {
+  padding: 0.5rem 1rem;
+  background: #f8f9fa;
+  border: 2px solid #27ae60;
+  border-radius: 5px;
+  color: #27ae60;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-weight: 500;
+}
+
+.btn-orden-compra:hover {
+  background: #27ae60;
+  color: white;
+}
+
+.btn-orden-compra:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: #f8f9fa;
+  color: #95a5a6;
+  border-color: #bdc3c7;
 }
 
 .stats-inventario {
@@ -380,6 +889,85 @@ onMounted(async () => {
   color: #7f8c8d;
 }
 
+/* Estilos del Modal - usando los estilos existentes */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 10px;
+  width: 90%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  border-bottom: 1px solid #e9ecef;
+  background: #f8f9fa;
+  border-radius: 10px 10px 0 0;
+}
+
+.modal-header h3 {
+  margin: 0;
+  color: #2c3e50;
+}
+
+.btn-cerrar {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #7f8c8d;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-cerrar:hover {
+  color: #e74c3c;
+}
+
+.modal-body {
+  padding: 1.5rem;
+}
+
+.form-orden-compra {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.form-select {
+  padding: 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+}
+
+.form-select:disabled {
+  background-color: #f8f9fa;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
 @media (max-width: 768px) {
   .inventario {
     padding: 1rem;
@@ -390,8 +978,21 @@ onMounted(async () => {
     align-items: stretch;
   }
   
+  .filtro-group select {
+    min-width: auto;
+  }
+  
+  .btn-orden-compra {
+    margin-top: 0.5rem;
+  }
+  
   .tabla-container {
     overflow-x: auto;
+  }
+  
+  .modal-content {
+    margin: 1rem;
+    width: calc(100% - 2rem);
   }
 }
 </style>

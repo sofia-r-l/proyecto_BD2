@@ -1,3 +1,4 @@
+// services/proveedores.service.ts
 import { api } from './api';
 
 export interface Proveedor {
