@@ -9,7 +9,9 @@
       <RouterLink to="/dashboard" class="nav-link">Dashboard</RouterLink>
       <RouterLink to="/productos" class="nav-link">Productos</RouterLink>
       <RouterLink to="/proveedores" class="nav-link">Proveedores</RouterLink>
+      <RouterLink to="/clientes" class="nav-link">Clientes</RouterLink>
       <RouterLink to="/orden-de-compra" class="nav-link">Órdenes de Compra</RouterLink>
+      <RouterLink to="/ventas" class="nav-link">Ventas</RouterLink>
       <RouterLink to="/inventario" class="nav-link">Inventario</RouterLink>
     </div>
     

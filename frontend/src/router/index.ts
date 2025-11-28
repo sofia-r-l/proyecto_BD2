@@ -41,12 +41,18 @@ const router = createRouter({
       component: () => import('@/views/OrdenCompra.vue'),
       meta: { requiresAuth: true }
     },
-    /*{
-      path: '/categorias',
-      name: 'Categorias',
-      component: () => import('@/views/Categorias.vue'),
+    {
+      path: '/ventas',
+      name: 'Ventas',
+      component: () => import('@/views/Ventas.vue'),
       meta: { requiresAuth: true }
-    },*/
+    },
+    {
+      path: '/clientes',
+      name: 'Clientes',
+      component: () => import('@/views/RegistroClientes.vue'),
+      meta: { requiresAuth: true }
+    },
     {
       path: '/',
       redirect: '/dashboard'
