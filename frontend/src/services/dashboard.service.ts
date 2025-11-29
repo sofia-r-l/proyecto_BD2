@@ -1,5 +1,6 @@
-
 //import api from './api';
+import { inventarioService } from './inventario.service';
+
 export interface DashboardStats {
     totalProductos: number;
     totalVentasHoy: number;
@@ -12,12 +13,17 @@ export interface DashboardStats {
 export const dashboardService = {
     async getStats(): Promise<DashboardStats> {
         try {
-            // Por ahora, datos de prueba - luego conectaremos con endpoints reales
+            // Obtener datos reales del inventario
+            const inventario = await inventarioService.getInventario();
+            const totalProductos = inventario.length;
+            const inventarioBajo = inventario.filter(p => p.Cantidad < 50).length;
+
+            // Datos simulados para ventas y clientes (aún no implementado)
             return {
-                totalProductos: 45,
+                totalProductos: totalProductos,
                 totalVentasHoy: 12500,
                 totalClientes: 156,
-                inventarioBajo: 8,
+                inventarioBajo: inventarioBajo,
                 ventasUltimaSemana: [
                     { fecha: '2024-01-15', total: 4500 },
                     { fecha: '2024-01-16', total: 5200 },
@@ -33,7 +39,16 @@ export const dashboardService = {
                 ]
             };
         } catch (error) {
-            throw new Error(`Error obteniendo estadísticas: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+            console.error('Error obteniendo estadísticas del dashboard:', error);
+            // Fallback a datos mock si falla la API
+            return {
+                totalProductos: 0,
+                totalVentasHoy: 0,
+                totalClientes: 0,
+                inventarioBajo: 0,
+                ventasUltimaSemana: [],
+                productosPopulares: []
+            };
         }
     }
 };

@@ -44,14 +44,19 @@ export const ordenCompraService = {
         }
     },
 
-    // ✅ Obtener todas las órdenes de compra desde la BD
+    // ✅ Obtener todas las órdenes de compra desde localStorage únicamente
     async obtenerOrdenesCompra(): Promise<OrdenCompraCompleta[]> {
         try {
-            console.log('📋 Obteniendo todas las órdenes de compra...');
+            console.log('📋 Obteniendo órdenes de compra desde localStorage...');
 
-            const response = await api.get('/ordenes-compra');
-            console.log('✅ Órdenes obtenidas:', response.data.data.length);
-            return response.data.data;
+            // Importar el servicio de almacenamiento
+            const { storageService } = await import('./storage.service');
+
+            // Obtener solo órdenes locales
+            const ordenesLocales = storageService.obtenerOrdenes();
+            console.log('📦 Órdenes locales:', ordenesLocales.length);
+
+            return ordenesLocales;
 
         } catch (error) {
             console.error('❌ Error obteniendo órdenes de compra:', error);
@@ -59,14 +64,16 @@ export const ordenCompraService = {
         }
     },
 
-    // ✅ Obtener órdenes pendientes desde la BD
+    // ✅ Obtener órdenes pendientes desde localStorage
     async obtenerOrdenesPendientes(): Promise<OrdenCompraCompleta[]> {
         try {
             console.log('⏳ Obteniendo órdenes pendientes...');
 
-            const response = await api.get('/ordenes-compra/pendientes');
-            console.log('✅ Órdenes pendientes obtenidas:', response.data.data.length);
-            return response.data.data;
+            const todasLasOrdenes = await this.obtenerOrdenesCompra();
+            const ordenesPendientes = todasLasOrdenes.filter(o => o.Estado === 'Pendiente');
+
+            console.log('✅ Órdenes pendientes obtenidas:', ordenesPendientes.length);
+            return ordenesPendientes;
 
         } catch (error) {
             console.error('❌ Error obteniendo órdenes pendientes:', error);
@@ -74,14 +81,20 @@ export const ordenCompraService = {
         }
     },
 
-    // ✅ Obtener una orden específica por ID desde la BD
+    // ✅ Obtener una orden específica por ID desde localStorage
     async obtenerOrdenPorId(id: number): Promise<OrdenCompraCompleta> {
         try {
             console.log(`📋 Obteniendo orden ${id}...`);
 
-            const response = await api.get(`/ordenes-compra/${id}`);
-            console.log('✅ Orden obtenida:', response.data.data);
-            return response.data.data;
+            const { storageService } = await import('./storage.service');
+            const ordenLocal = storageService.obtenerOrdenPorId(id);
+
+            if (ordenLocal) {
+                console.log('✅ Orden obtenida desde localStorage:', ordenLocal);
+                return ordenLocal;
+            }
+
+            throw new Error(`Orden ${id} no encontrada`);
 
         } catch (error) {
             console.error('❌ Error obteniendo orden:', error);
@@ -89,16 +102,15 @@ export const ordenCompraService = {
         }
     },
 
-    // ✅ Actualizar estado de una orden
+    // ✅ Actualizar estado de una orden en localStorage
     async actualizarEstadoOrden(id: number, nuevoEstado: string): Promise<any> {
         try {
             console.log(`🔄 Actualizando orden ${id} a estado: ${nuevoEstado}`);
 
-            const response = await api.patch(`/ordenes-compra/${id}/estado`, {
-                estado: nuevoEstado
-            });
-            console.log('✅ Estado actualizado:', response.data);
-            return response.data;
+            const { storageService } = await import('./storage.service');
+            storageService.actualizarEstado(id, nuevoEstado as OrdenCompraCompleta['Estado']);
+            console.log('✅ Estado actualizado en localStorage');
+            return { success: true, message: 'Estado actualizado' };
 
         } catch (error) {
             console.error('❌ Error actualizando orden:', error);
@@ -133,44 +145,6 @@ export const ordenCompraService = {
         } catch (error) {
             console.error('❌ Error obteniendo productos:', error);
             throw new Error(`Error obteniendo productos: ${error instanceof Error ? error.message : 'Error desconocido'}`);
-        }
-    },
-
-    // ✅ Método de simulación (solo para desarrollo/testing)
-    async crearOrdenCompraSimulada(orden: OrdenCompra): Promise<any> {
-        try {
-            console.log('🔄 Creando orden de compra (simulación)...', orden);
-
-            await new Promise(resolve => setTimeout(resolve, 1000));
-
-            const total = orden.Cantidad * orden.PrecioUnitario;
-
-            const respuestaSimulada = {
-                success: true,
-                data: {
-                    OrdenID: Math.floor(Math.random() * 1000) + 1000,
-                    ProveedorID: orden.ProveedorID,
-                    ProductoID: orden.ProductoID,
-                    Cantidad: orden.Cantidad,
-                    PrecioUnitario: orden.PrecioUnitario,
-                    FechaEntrega: orden.FechaEntrega,
-                    SucursalID: orden.SucursalID,
-                    Estado: 'Pendiente',
-                    FechaCreacion: new Date().toISOString(),
-                    Total: total,
-                    ProveedorNombre: 'Proveedor Simulado',
-                    ProductoNombre: 'Producto Simulado',
-                    SucursalNombre: 'Sucursal Simulada'
-                },
-                message: 'Orden de compra creada exitosamente (simulación)'
-            };
-
-            console.log('✅ Orden creada simulada:', respuestaSimulada);
-            return respuestaSimulada;
-
-        } catch (error) {
-            console.error('❌ Error creando orden de compra simulada:', error);
-            throw new Error(`Error creando orden de compra: ${error instanceof Error ? error.message : 'Error desconocido'}`);
         }
     }
 };

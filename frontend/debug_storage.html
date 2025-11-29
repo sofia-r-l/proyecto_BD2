@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug localStorage - Órdenes de Compra</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+
+        h1 {
+            color: #2c3e50;
+        }
+
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .btn-primary {
+            background: #3498db;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .btn-success {
+            background: #27ae60;
+            color: white;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        pre {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            border-left: 4px solid #3498db;
+        }
+
+        .orden-item {
+            background: #f8f9fa;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 4px solid #3498db;
+        }
+
+        .orden-item.error {
+            border-left-color: #e74c3c;
+            background: #fee;
+        }
+
+        .label {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .value {
+            color: #555;
+        }
+
+        .error-text {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🔍 Debug localStorage - Órdenes de Compra</h1>
+
+    <div class="container">
+        <h2>Acciones</h2>
+        <button class="btn-primary" onclick="cargarOrdenes()">🔄 Cargar Órdenes</button>
+        <button class="btn-danger" onclick="limpiarOrdenes()">🗑️ Limpiar Todas las Órdenes</button>
+        <button class="btn-success" onclick="exportarJSON()">📥 Exportar JSON</button>
+    </div>
+
+    <div class="container">
+        <h2>Órdenes en localStorage (<span id="count">0</span>)</h2>
+        <div id="ordenes"></div>
+    </div>
+
+    <div class="container">
+        <h2>JSON Raw</h2>
+        <pre id="json-raw">No hay datos</pre>
+    </div>
+
+    <script>
+        function cargarOrdenes() {
+            const data = localStorage.getItem('ordenes_compra_local');
+            const ordenesDiv = document.getElementById('ordenes');
+            const jsonRaw = document.getElementById('json-raw');
+            const countSpan = document.getElementById('count');
+
+            if (!data) {
+                ordenesDiv.innerHTML = '<p>No hay órdenes guardadas</p>';
+                jsonRaw.textContent = 'No hay datos';
+                countSpan.textContent = '0';
+                return;
+            }
+
+            try {
+                const ordenes = JSON.parse(data);
+                countSpan.textContent = ordenes.length;
+
+                // Mostrar JSON formateado
+                jsonRaw.textContent = JSON.stringify(ordenes, null, 2);
+
+                // Mostrar cada orden
+                ordenesDiv.innerHTML = '';
+                ordenes.forEach((orden, index) => {
+                    const hasError = orden.ProductoNombre === 'Producto desconocido';
+                    const div = document.createElement('div');
+                    div.className = 'orden-item' + (hasError ? ' error' : '');
+                    div.innerHTML = `
+                        <h3>Orden #${orden.OrdenID} ${hasError ? '<span class="error-text">⚠️ ERROR</span>' : '✅'}</h3>
+                        <p><span class="label">Producto:</span> <span class="value ${hasError ? 'error-text' : ''}">${orden.ProductoNombre}</span></p>
+                        <p><span class="label">ProductoID:</span> <span class="value">${orden.ProductoID}</span></p>
+                        <p><span class="label">Proveedor:</span> <span class="value">${orden.ProveedorNombre}</span></p>
+                        <p><span class="label">Sucursal:</span> <span class="value">${orden.SucursalNombre}</span></p>
+                        <p><span class="label">SucursalID:</span> <span class="value">${orden.SucursalID}</span></p>
+                        <p><span class="label">Cantidad:</span> <span class="value">${orden.Cantidad}</span></p>
+                        <p><span class="label">Precio Unitario:</span> <span class="value">L. ${orden.PrecioUnitario.toLocaleString()}</span></p>
+                        <p><span class="label">Total:</span> <span class="value">L. ${orden.Total.toLocaleString()}</span></p>
+                        <p><span class="label">Estado:</span> <span class="value">${orden.Estado}</span></p>
+                        <p><span class="label">Fecha Entrega:</span> <span class="value">${orden.FechaEntrega}</span></p>
+                        <p><span class="label">Fecha Creación:</span> <span class="value">${new Date(orden.FechaCreacion).toLocaleString()}</span></p>
+                        <button class="btn-danger" onclick="eliminarOrden(${index})">🗑️ Eliminar esta orden</button>
+                    `;
+                    ordenesDiv.appendChild(div);
+                });
+            } catch (error) {
+                ordenesDiv.innerHTML = `<p class="error-text">Error al parsear JSON: ${error.message}</p>`;
+                jsonRaw.textContent = data;
+            }
+        }
+
+        function limpiarOrdenes() {
+            if (confirm('¿Estás seguro de que quieres eliminar TODAS las órdenes?')) {
+                localStorage.removeItem('ordenes_compra_local');
+                alert('✅ Todas las órdenes han sido eliminadas');
+                cargarOrdenes();
+            }
+        }
+
+        function eliminarOrden(index) {
+            if (confirm(`¿Eliminar la orden en posición ${index}?`)) {
+                const data = localStorage.getItem('ordenes_compra_local');
+                const ordenes = JSON.parse(data);
+                ordenes.splice(index, 1);
+                localStorage.setItem('ordenes_compra_local', JSON.stringify(ordenes));
+                alert('✅ Orden eliminada');
+                cargarOrdenes();
+            }
+        }
+
+        function exportarJSON() {
+            const data = localStorage.getItem('ordenes_compra_local');
+            if (!data) {
+                alert('No hay datos para exportar');
+                return;
+            }
+
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `ordenes_compra_${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            alert('✅ JSON exportado');
+        }
+
+        // Cargar automáticamente al abrir la página
+        cargarOrdenes();
+    </script>
+</body>
+
+</html>

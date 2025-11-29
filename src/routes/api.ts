@@ -421,4 +421,12 @@ router.get('/auth/me', (req, res) => {
     });
 });
 
+// Importar rutas de órdenes de compra
+import ordenesCompraRouter from './ordenesCompra';
+
+// ... (existing code)
+
+// Registrar rutas de órdenes de compra
+router.use('/ordenes-compra', ordenesCompraRouter);
+
 export default router;

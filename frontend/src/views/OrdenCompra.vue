@@ -270,7 +270,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { ordenCompraService, type OrdenCompraCompleta } from '@/services/ordenCompra.service'
 
 // Estado
@@ -293,6 +294,9 @@ const sucursales = ref([
   'Sucursal Este',
   'Sucursal Oeste'
 ])
+
+const router = useRouter()
+const route = useRoute()
 
 // Computed
 const ordenesFiltradas = computed(() => {
@@ -442,6 +446,16 @@ const getDiasRestantesClass = (fechaEntrega: string) => {
 onMounted(() => {
   cargarOrdenes()
 })
+
+watch(() => route.query.refresh, (newVal) => {
+  if (newVal === 'true') {
+    console.log('Detectado parámetro refresh=true, recargando órdenes...');
+    cargarOrdenes();
+    // Opcional: limpiar el parámetro de la URL si no se necesita mantener
+    router.replace({ query: { refresh: undefined } });
+  }
+});
+
 </script>
 
 <style scoped>

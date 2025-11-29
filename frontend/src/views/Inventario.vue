@@ -132,19 +132,19 @@
         <div class="filtro-group">
           <label for="producto">Producto *</label>
           
-          <select 
+        <select 
           id="producto"
-          v-model="ordenCompra.ProductoID"
+          v-model="productoSeleccionadoIndex"
           required
           @change="onProductoChange"
           class="form-select"
           :disabled="productosConAlerta.length === 0"
         >
-          <option value="0">Seleccione un producto</option>
+          <option value="">Seleccione un producto</option>
           <option 
             v-for="(producto, index) in productosConAlerta" 
-            :key="index"
-            :value="index + 1"
+            :key="`${producto.ProductoID}-${producto.SucursalID}`"
+            :value="index"
           >
             {{ producto.Producto }} - {{ producto.Sucursal }} 
             (Stock: {{ producto.Cantidad }} - {{ getEstadoStock(producto.Cantidad) }})
@@ -278,6 +278,8 @@
             </p>
             <p style="margin: 0.25rem 0; color: #555;"><strong>Sucursal:</strong> {{ productoSeleccionado.Sucursal }}</p>
             <p style="margin: 0.25rem 0; color: #555;"><strong>Precio actual:</strong> L. {{ parseFloat(productoSeleccionado.PrecioBase).toLocaleString() }}</p>
+            
+          
           </div>
         </div>
 
@@ -328,6 +330,7 @@
 <script setup lang="ts">
 import { nextTick } from 'vue';
 import { ref, computed, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 import { 
   inventarioService, 
   type ProductoInventario, 
@@ -335,6 +338,7 @@ import {
   type OrdenCompra,
   type Proveedor 
 } from '@/services/inventario.service';
+import { ordenCompraService } from '@/services/ordenCompra.service';
 
 // Estados
 const inventario = ref<ProductoInventario[]>([]);
@@ -349,6 +353,9 @@ const mostrarModal = ref(false);
 const procesandoOrden = ref(false);
 const proveedores = ref<Proveedor[]>([]);
 const cargandoProveedores = ref(false);
+const productoSeleccionadoIndex = ref<number | string>('');
+
+const router = useRouter();
 
 // Datos del formulario
 const ordenCompra = ref({
@@ -402,10 +409,7 @@ const proveedorSeleccionado = computed(() => {
   return proveedores.value.find((p: Proveedor) => p.ProveedorID === ordenCompra.value.ProveedorID);
 });
 
-const productoSeleccionado = computed(() => {
-  if (!ordenCompra.value.ProductoID) return null;
-  return productosConAlerta.value.find((p: ProductoConAlerta) => p.ProductoID === ordenCompra.value.ProductoID);
-});
+
 
 const minDate = computed(() => {
   return new Date().toISOString().split('T')[0];
@@ -417,7 +421,33 @@ const onProveedorChange = () => {
   }
 };
 
+// 1. Computed property para el producto seleccionado
+const productoSeleccionado = computed(() => {
+  if (productoSeleccionadoIndex.value === '' || productoSeleccionadoIndex.value === null) return null;
+  const index = typeof productoSeleccionadoIndex.value === 'string' 
+    ? parseInt(productoSeleccionadoIndex.value) 
+    : productoSeleccionadoIndex.value;
+  return productosConAlerta.value[index] || null;
+});
 
+// 2. Computed property para la sucursal seleccionada (LA QUE CAUSA EL ERROR)
+const sucursalSeleccionada = computed(() => {
+  return productoSeleccionado.value?.Sucursal || '';
+});
+/*
+// 3. Función de mapeo actualizada
+const mapearSucursalAId = (sucursalNombre: string): number => {
+  const mapeoSucursales: { [key: string]: number } = {
+    'Sucursal Centro': 1,
+    'Sucursal Norte': 2, 
+    'Sucursal Sur': 3,
+    'Sucursal Central': 1, // Por si acaso también existe este nombre
+    // Agrega más según lo que veas en tus logs
+  };
+  
+  return mapeoSucursales[sucursalNombre] || 1; // Default a 1 si no se encuentra
+};
+*/
 // Methods
 const getEstadoStock = (cantidad: number): string => {
   if (cantidad >= 50) return 'Normal';
@@ -482,25 +512,16 @@ const mostrarModalOrdenCompra = async () => {
     // Cargar proveedores
     await cargarProveedores();
     
-    // Mantener ProductoID si ya había uno seleccionado
-    const productoIdAnterior = ordenCompra.value.ProductoID;
-    
+    // Resetear el formulario
+    productoSeleccionadoIndex.value = '';
     ordenCompra.value = {
       ProveedorID: 0,
-      ProductoID: productoIdAnterior,
+      ProductoID: 0,
       Cantidad: 0,
       PrecioUnitario: 0,
       FechaEntrega: '',
       SucursalID: 0
     };
-    
-    // Si ya había un producto seleccionado, actualizar sus datos
-    if (productoIdAnterior > 0) {
-      console.log('🔄 Re-ejecutando onProductoChange para producto seleccionado:', productoIdAnterior);
-      setTimeout(() => {
-        onProductoChange();
-      }, 100);
-    }
     
   } catch (error) {
     console.error('Error cargando modal:', error);
@@ -517,68 +538,81 @@ const reintentarCarga = () => {
 const onProductoChange = () => {
   console.log('🔄 onProductoChange ejecutado');
   
-  const productoIndex = ordenCompra.value.ProductoID;
-  console.log('🎯 Índice seleccionado:', productoIndex);
-  
-  // Verificar que se seleccionó un producto válido (índice > 0)
-  if (!productoIndex || productoIndex === 0) {
+  if (productoSeleccionadoIndex.value === '' || productoSeleccionadoIndex.value === null) {
     console.log('❌ No hay producto seleccionado');
+    ordenCompra.value.ProductoID = 0;
     ordenCompra.value.PrecioUnitario = 0;
     ordenCompra.value.SucursalID = 0;
     return;
   }
   
-  // El índice 0 es "Seleccione un producto", así que restamos 1
-  const indexReal = productoIndex - 1;
+  const index = typeof productoSeleccionadoIndex.value === 'string' 
+    ? parseInt(productoSeleccionadoIndex.value) 
+    : productoSeleccionadoIndex.value;
   
-  // Obtener el producto usando el índice
-  const producto = productosConAlerta.value[indexReal];
+  const producto = productosConAlerta.value[index];
   
   if (producto) {
     console.log('✅ Producto encontrado:', producto.Producto);
-    console.log('💰 PrecioBase:', producto.PrecioBase);
-    console.log('🏪 Sucursal:', producto.Sucursal);
     
-    // ⭐⭐ SOLUCIÓN: Como no hay SucursalID, mapear el nombre de sucursal a un ID ⭐⭐
-    const sucursalId = mapearSucursalAId(producto.Sucursal);
+    // ⭐ SOLUCIÓN TEMPORAL: Buscar IDs reales en el inventario completo
+    const productoCompleto = inventario.value.find(item => 
+      item.Producto === producto.Producto && item.Sucursal === producto.Sucursal
+    );
     
-    ordenCompra.value.SucursalID = sucursalId;
+    // Si encontramos el producto completo con IDs, usarlos
+    if (productoCompleto && productoCompleto.ProductoID && productoCompleto.SucursalID) {
+      ordenCompra.value.ProductoID = productoCompleto.ProductoID;
+      ordenCompra.value.SucursalID = productoCompleto.SucursalID;
+      console.log('🆔 IDs encontrados en inventario completo');
+    } else {
+      // Fallback: mapear nombres a IDs
+      ordenCompra.value.ProductoID = mapearProductoAId(producto.Producto);
+      ordenCompra.value.SucursalID = mapearSucursalAId(producto.Sucursal);
+      console.log('⚠️ IDs generados por mapeo');
+    }
+    
     ordenCompra.value.PrecioUnitario = parseFloat(producto.PrecioBase) || 0;
     
-    console.log('💰 Precio convertido:', ordenCompra.value.PrecioUnitario);
-    console.log('🏪 SucursalID asignado:', ordenCompra.value.SucursalID);
+    console.log('✅ Datos guardados:');
+    console.log('   ProductoID:', ordenCompra.value.ProductoID);
+    console.log('   SucursalID:', ordenCompra.value.SucursalID);
+    console.log('   PrecioUnitario:', ordenCompra.value.PrecioUnitario);
     
   } else {
-    console.log('❌ Producto no encontrado para índice:', indexReal);
+    console.log('❌ Producto no encontrado');
+    ordenCompra.value.ProductoID = 0;
     ordenCompra.value.PrecioUnitario = 0;
     ordenCompra.value.SucursalID = 0;
   }
 };
 
-const sucursalSeleccionada = computed(() => {
-  if (!ordenCompra.value.ProductoID || ordenCompra.value.ProductoID === 0) {
-    return '';
-  }
-  
-  const indexReal = ordenCompra.value.ProductoID - 1;
-  const producto = productosConAlerta.value[indexReal];
-  
-  // Usar optional chaining para evitar el error
-  return producto?.Sucursal || '';
-});
-
-// FUNCIÓN PARA MAPEAR NOMBRE DE SUCURSAL A ID 
-const mapearSucursalAId = (sucursalNombre: string): number => {
-  const mapeoSucursales: { [key: string]: number } = {
-    'Sucursal Central': 1,
-    'Sucursal Norte': 2, 
-    'Sucursal Sur': 3,
-    // Agrega más mapeos según tus sucursales reales
+// Mapeo de productos a IDs (basado en tus datos)
+const mapearProductoAId = (productoNombre: string): number => {
+  const mapeoProductos: { [key: string]: number } = {
+    'Ibuprofeno 400mg': 1,
+    'Paracetamol 500mg': 2,
+    'Amoxicilina 500mg': 3,
+    'Ciprofloxacino 250mg': 4,
+    'Vitamina C 1g': 5,
+    'Complejo B': 6,
+    'Gasas Estériles 10x10': 7,
+    'Jeringas 5ml': 8,
+    'Jabón Antibacterial': 9,
+    'Alcohol Gel 70%': 10
   };
-  
-  return mapeoSucursales[sucursalNombre] || 1; // Default a 1 si no se encuentra
+  return mapeoProductos[productoNombre] || 1;
 };
 
+// Mapeo de sucursales a IDs
+const mapearSucursalAId = (sucursalNombre: string): number => {
+  const mapeoSucursales: { [key: string]: number } = {
+    'Sucursal Centro': 1,
+    'Sucursal Norte': 2, 
+    'Sucursal Sur': 3
+  };
+  return mapeoSucursales[sucursalNombre] || 1;
+};
 
 
 const generarOrdenCompra = async () => {
@@ -602,6 +636,8 @@ const generarOrdenCompra = async () => {
     console.log('Orden creada:', resultado);
     
     cerrarModal();
+    // Redireccionar a la página de órdenes de compra con un flag para refrescar
+    router.push({ name: 'OrdenDeCompra', query: { refresh: 'true' } });
     
   } catch (error) {
     console.error('Error generando orden de compra:', error);

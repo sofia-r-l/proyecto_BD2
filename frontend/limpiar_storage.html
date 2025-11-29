@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Limpiar localStorage</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            max-width: 500px;
+        }
+
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+
+        .status {
+            font-size: 4rem;
+            margin: 20px 0;
+        }
+
+        .message {
+            font-size: 1.2rem;
+            color: #555;
+            margin: 20px 0;
+        }
+
+        .success {
+            color: #27ae60;
+            font-weight: bold;
+        }
+
+        .info {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #2196f3;
+        }
+
+        button {
+            padding: 12px 30px;
+            margin: 10px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #3498db;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.3);
+        }
+
+        .btn-success {
+            background: #27ae60;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #229954;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🧹 Limpiar localStorage</h1>
+        <div class="status" id="status">🗑️</div>
+        <div class="message" id="message">Limpiando datos de órdenes de compra...</div>
+        <div class="info" id="info"></div>
+        <div id="actions"></div>
+    </div>
+
+    <script>
+        function limpiarStorage() {
+            const key = 'ordenes_compra_local';
+            const statusDiv = document.getElementById('status');
+            const messageDiv = document.getElementById('message');
+            const infoDiv = document.getElementById('info');
+            const actionsDiv = document.getElementById('actions');
+
+            // Verificar si hay datos
+            const data = localStorage.getItem(key);
+
+            if (!data) {
+                statusDiv.textContent = '✅';
+                messageDiv.innerHTML = '<span class="success">localStorage ya está limpio</span>';
+                infoDiv.innerHTML = 'No hay órdenes de compra guardadas.';
+                actionsDiv.innerHTML = `
+                    <button class="btn-success" onclick="window.location.href='http://localhost:5173/inventario'">
+                        📦 Ir a Inventario
+                    </button>
+                `;
+                return;
+            }
+
+            try {
+                const ordenes = JSON.parse(data);
+                const cantidad = ordenes.length;
+
+                // Limpiar
+                localStorage.removeItem(key);
+
+                // Verificar que se limpió
+                const verificacion = localStorage.getItem(key);
+
+                if (verificacion === null) {
+                    statusDiv.textContent = '✅';
+                    messageDiv.innerHTML = '<span class="success">¡localStorage limpiado exitosamente!</span>';
+                    infoDiv.innerHTML = `
+                        <strong>${cantidad}</strong> orden(es) de compra eliminada(s).<br>
+                        Ahora puedes crear nuevas órdenes sin datos antiguos.
+                    `;
+                    actionsDiv.innerHTML = `
+                        <button class="btn-primary" onclick="window.location.href='http://localhost:5173/inventario'">
+                            📦 Ir a Inventario
+                        </button>
+                        <button class="btn-success" onclick="window.location.href='http://localhost:5173/orden-de-compra'">
+                            📋 Ver Órdenes
+                        </button>
+                    `;
+                } else {
+                    throw new Error('No se pudo limpiar localStorage');
+                }
+            } catch (error) {
+                statusDiv.textContent = '❌';
+                messageDiv.innerHTML = '<span style="color: #e74c3c;">Error al limpiar localStorage</span>';
+                infoDiv.innerHTML = `Error: ${error.message}`;
+                actionsDiv.innerHTML = `
+                    <button class="btn-primary" onclick="limpiarStorage()">
+                        🔄 Reintentar
+                    </button>
+                `;
+            }
+        }
+
+        // Ejecutar automáticamente al cargar
+        window.onload = function () {
+            setTimeout(limpiarStorage, 500);
+        };
+    </script>
+</body>
+
+</html>

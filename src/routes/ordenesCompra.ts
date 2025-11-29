@@ -1,25 +1,19 @@
-// Crea un nuevo archivo: routes/ordenesCompra.ts
 import express from 'express';
-import { ordenCompraService } from '../services/ordenCompraService';
+import { ordenCompraController } from '../controllers/ordenCompraController';
 
 const router = express.Router();
 
-router.post('/', async (req: express.Request, res: express.Response) => {
-    try {
-        const orden = req.body;
-        const result = await ordenCompraService.crearOrdenCompra(orden);
-        res.json({
-            success: true,
-            data: result,
-            message: 'Orden de compra creada exitosamente'
-        });
-    } catch (error) {
-        console.error('Error creando orden de compra:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Error interno del servidor'
-        });
-    }
-});
+// Rutas específicas primero
+router.get('/pendientes', ordenCompraController.getOrdenesPendientes);
+router.get('/proveedores', ordenCompraController.getProveedores);
+router.get('/productos', ordenCompraController.getProductos);
+
+// Rutas generales
+router.get('/', ordenCompraController.getTodasLasOrdenes);
+router.post('/', ordenCompraController.crearOrden);
+
+// Rutas con parámetros
+router.get('/:id', ordenCompraController.getOrdenPorId);
+router.patch('/:id/estado', ordenCompraController.actualizarEstado);
 
 export default router;
