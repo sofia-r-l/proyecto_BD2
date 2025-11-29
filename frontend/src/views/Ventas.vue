@@ -8,19 +8,22 @@
 
       <div class="field">
         <label>Cliente</label>
-        <select>
+        <select v-model="selectedClienteId" @change="cargarDatosCliente">
           <option value="">Seleccione un cliente</option>
+          <option v-for="cliente in clientes" :key="cliente.id" :value="cliente.id">
+            {{ cliente.nombre }}
+          </option>
         </select>
       </div>
 
       <div class="field">
         <label>Teléfono</label>
-        <input type="text" disabled />
+        <input type="text" :value="clienteSeleccionado?.telefono || ''" disabled />
       </div>
 
       <div class="field">
         <label>Dirección</label>
-        <input type="text" disabled />
+        <input type="text" :value="clienteSeleccionado?.direccion || ''" disabled />
       </div>
     </div>
 
@@ -30,19 +33,22 @@
 
       <div class="field">
         <label>Producto</label>
-        <select>
+        <select v-model="selectedProductoId" @change="cargarDatosProducto">
           <option value="">Seleccione un producto</option>
+          <option v-for="producto in productos" :key="producto.id" :value="producto.id">
+            {{ producto.nombre }}
+          </option>
         </select>
       </div>
 
       <div class="field">
         <label>Precio</label>
-        <input type="number" disabled />
+        <input type="number" :value="productoSeleccionado?.precio || ''" disabled />
       </div>
 
       <div class="field">
         <label>Stock</label>
-        <input type="number" disabled />
+        <input type="number" :value="productoSeleccionado?.stock || ''" disabled />
       </div>
     </div>
 
@@ -52,26 +58,124 @@
 
       <div class="field">
         <label>Cantidad</label>
-        <input type="number" />
+        <input type="number" v-model.number="cantidad" @input="calcularTotal" min="1" />
       </div>
 
       <div class="field">
         <label>Total</label>
-        <input type="number" disabled />
+        <input type="number" :value="total" disabled />
       </div>
 
       <div class="field">
         <label>Fecha</label>
-        <input type="date" />
+        <input type="date" v-model="fecha" />
       </div>
     </div>
 
     <!-- Botón -->
     <div class="card-section">
-      <button  class="btn-registrar">Registrar Venta</button>
+      <button class="btn-registrar" @click="registrarVenta">Registrar Venta</button>
+    </div>
+
+    <!-- Lista de ventas registradas -->
+    <div class="card-section" v-if="ventas.length">
+      <h3>Ventas Registradas</h3>
+      <ul>
+        <li v-for="(v, index) in ventas" :key="index">
+          {{ v.fecha }} - {{ v.cliente }} compró {{ v.cantidad }} de {{ v.producto }} - Total: ${{
+            v.total
+          }}
+        </li>
+      </ul>
     </div>
   </div>
 </template>
+
+<script setup>
+import { ref } from 'vue'
+
+// Datos simulados pero más reales para una comercializadora médica
+const clientes = ref([
+  { id: 1, nombre: 'Clínica San José', telefono: '22334455', direccion: 'Av. Central 123' },
+  { id: 2, nombre: 'Hospital La Paz', telefono: '33445566', direccion: 'Calle Principal 45' },
+  { id: 3, nombre: 'Consultorio Médico Dr. Gómez', telefono: '44556677', direccion: 'Calle 7 #89' },
+])
+
+const productos = ref([
+  { id: 1, nombre: 'Guantes de látex (100 unidades)', precio: 15, stock: 100 },
+  { id: 2, nombre: 'Mascarillas quirúrgicas (50 unidades)', precio: 10, stock: 200 },
+  { id: 3, nombre: 'Termómetro digital infrarrojo', precio: 45, stock: 30 },
+  { id: 4, nombre: 'Alcohol etílico 70% (1 litro)', precio: 8, stock: 150 },
+  { id: 5, nombre: 'Jeringas 5ml (50 unidades)', precio: 12, stock: 120 },
+  { id: 6, nombre: 'Curitas adhesivas (100 unidades)', precio: 5, stock: 300 },
+  { id: 7, nombre: 'Aspirina 500mg (20 tabletas)', precio: 7, stock: 250 },
+  { id: 8, nombre: 'Estetoscopio profesional', precio: 60, stock: 25 },
+])
+
+// Estados
+const selectedClienteId = ref('')
+const selectedProductoId = ref('')
+const clienteSeleccionado = ref(null)
+const productoSeleccionado = ref(null)
+const cantidad = ref(1)
+const total = ref(0)
+const fecha = ref(new Date().toISOString().split('T')[0])
+const ventas = ref([])
+
+// Funciones
+function cargarDatosCliente() {
+  clienteSeleccionado.value = clientes.value.find((c) => c.id === Number(selectedClienteId.value))
+}
+
+function cargarDatosProducto() {
+  productoSeleccionado.value = productos.value.find(
+    (p) => p.id === Number(selectedProductoId.value),
+  )
+  calcularTotal()
+}
+
+function calcularTotal() {
+  if (productoSeleccionado.value && cantidad.value > 0) {
+    total.value = productoSeleccionado.value.precio * cantidad.value
+  } else {
+    total.value = 0
+  }
+}
+
+function registrarVenta() {
+  if (!clienteSeleccionado.value || !productoSeleccionado.value || cantidad.value <= 0) {
+    alert('Complete todos los campos antes de registrar la venta.')
+    return
+  }
+  if (cantidad.value > productoSeleccionado.value.stock) {
+    alert('No hay suficiente stock.')
+    return
+  }
+
+  // Registrar venta
+  ventas.value.push({
+    cliente: clienteSeleccionado.value.nombre,
+    producto: productoSeleccionado.value.nombre,
+    cantidad: cantidad.value,
+    total: total.value,
+    fecha: fecha.value,
+  })
+
+  // Actualizar stock
+  productoSeleccionado.value.stock -= cantidad.value
+
+  // Reset campos
+  selectedClienteId.value = ''
+  selectedProductoId.value = ''
+  clienteSeleccionado.value = null
+  productoSeleccionado.value = null
+  cantidad.value = 1
+  total.value = 0
+  fecha.value = new Date().toISOString().split('T')[0]
+
+  alert('Venta registrada con éxito!')
+}
+</script>
 
 <style>
 /* Contenedor principal */
@@ -146,7 +250,7 @@
   padding: 14px;
   border: none;
   border-radius: 14px;
-  background: linear-gradient(135deg, #1A73E8, #4aa3ff);
+  background: linear-gradient(135deg, #1a73e8, #4aa3ff);
   color: white;
   font-size: 17px;
   font-weight: 600;
@@ -159,7 +263,7 @@
 }
 
 .btn-registrar::before {
-  content: "";
+  content: '';
   position: absolute;
   top: 0;
   left: -100%;
@@ -177,5 +281,4 @@
 .btn-registrar:hover {
   transform: translateY(-3px);
 }
-
 </style>
