@@ -167,5 +167,39 @@ export const storageService = {
             console.error('❌ Error importando JSON:', error);
             throw error;
         }
+    },
+
+    // === GESTIÓN DE SALDOS DE PROVEEDORES ===
+
+    obtenerAjustesProveedores(): Record<number, number> {
+        try {
+            const ajustes = localStorage.getItem('ajustes_saldo_proveedores');
+            return ajustes ? JSON.parse(ajustes) : {};
+        } catch (error) {
+            console.error('Error al leer ajustes de saldo:', error);
+            return {};
+        }
+    },
+
+    guardarAjustesProveedores(ajustes: Record<number, number>): void {
+        try {
+            localStorage.setItem('ajustes_saldo_proveedores', JSON.stringify(ajustes));
+        } catch (error) {
+            console.error('Error al guardar ajustes de saldo:', error);
+        }
+    },
+
+    actualizarSaldoProveedor(proveedorId: number, monto: number): void {
+        const ajustes = this.obtenerAjustesProveedores();
+        // Sumamos el monto al ajuste existente (o 0 si no existe)
+        // Nota: El monto es positivo si es una deuda (orden aprobada)
+        ajustes[proveedorId] = (ajustes[proveedorId] || 0) + monto;
+        this.guardarAjustesProveedores(ajustes);
+        console.log(`💰 Saldo ajustado para proveedor ${proveedorId}: +${monto} (Total ajuste: ${ajustes[proveedorId]})`);
+    },
+
+    obtenerAjusteProveedor(proveedorId: number): number {
+        const ajustes = this.obtenerAjustesProveedores();
+        return ajustes[proveedorId] || 0;
     }
 };

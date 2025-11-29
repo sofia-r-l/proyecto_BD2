@@ -108,6 +108,17 @@ export const ordenCompraService = {
             console.log(`🔄 Actualizando orden ${id} a estado: ${nuevoEstado}`);
 
             const { storageService } = await import('./storage.service');
+
+            // Si el nuevo estado es 'Aprobada', necesitamos descontar del crédito del proveedor
+            if (nuevoEstado === 'Aprobada') {
+                const orden = storageService.obtenerOrdenPorId(id);
+                if (orden) {
+                    // Actualizar saldo del proveedor (sumar deuda)
+                    storageService.actualizarSaldoProveedor(orden.ProveedorID, orden.Total);
+                    console.log(`💰 Crédito descontado para proveedor ${orden.ProveedorID}: L. ${orden.Total}`);
+                }
+            }
+
             storageService.actualizarEstado(id, nuevoEstado as OrdenCompraCompleta['Estado']);
             console.log('✅ Estado actualizado en localStorage');
             return { success: true, message: 'Estado actualizado' };

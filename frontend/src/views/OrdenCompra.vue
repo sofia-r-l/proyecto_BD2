@@ -290,9 +290,6 @@ const sucursales = ref([
   'Sucursal Centro',
   'Sucursal Norte', 
   'Sucursal Sur',
-  'Sucursal Central',
-  'Sucursal Este',
-  'Sucursal Oeste'
 ])
 
 const router = useRouter()

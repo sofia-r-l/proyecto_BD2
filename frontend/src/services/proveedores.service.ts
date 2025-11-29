@@ -32,7 +32,23 @@ export const proveedoresService = {
     async getProveedores(): Promise<Proveedor[]> {
         try {
             const response = await api.get('/proveedores');
-            return response.data.data;
+            const proveedores = response.data.data;
+
+            // Importar storageService para obtener ajustes locales
+            const { storageService } = await import('./storage.service');
+            const ajustes = storageService.obtenerAjustesProveedores();
+
+            // Aplicar ajustes
+            return proveedores.map((p: Proveedor) => {
+                const ajuste = ajustes[p.ProveedorID] || 0;
+                // SaldoActual aumenta con las deudas (órdenes aprobadas)
+                // CreditoDisponible disminuye con las deudas
+                return {
+                    ...p,
+                    SaldoActual: p.SaldoActual + ajuste,
+                    CreditoDisponible: p.CreditoDisponible - ajuste
+                };
+            });
         } catch (error) {
             console.error('Error obteniendo proveedores:', error);
             throw new Error(`Error obteniendo proveedores: ${error instanceof Error ? error.message : 'Error desconocido'}`);
