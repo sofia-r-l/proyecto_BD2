@@ -97,10 +97,6 @@
           <span>Proveedores</span>
         </button>
         
-        <button @click="$router.push('/categorias')" class="action-btn">
-          <span class="action-icon">📁</span>
-          <span>Categorías</span>
-        </button>
       </div>
     </div>
   </div>

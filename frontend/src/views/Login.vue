@@ -44,9 +44,7 @@
       </form>
       
       <div class="demo-credentials">
-        <h3>Credenciales de Demo:</h3>
-        <p><strong>Email:</strong> admin@comercializadora.com</p>
-        <p><strong>Password:</strong> Admin123!</p>
+        <h3>Ingrese sus credenciales</h3>
       </div>
     </div>
   </div>
